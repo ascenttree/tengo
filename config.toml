@@ -1,0 +1,6 @@
+# It's better not to change this file unless you know what you are doing
+[UDPServer]
+Port = 16384
+
+[TCPServer]
+Port = 16384
