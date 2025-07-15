@@ -24,5 +24,7 @@ Any osu!arcade clients that are launched on PCs connected to the same network as
 ## Credits
 
 [BurntSushi/toml](https://github.com/BurntSushi/toml) - Config parser
+
 [Lekuruu](https://github.com/lekuruu) - Logging, and stream utils
+
 [peppy](https://github.com/ppy) - Making osu!arcade
