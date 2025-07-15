@@ -1,3 +1,4 @@
-# jj-go
-A go implementation of JJ/GouGou/RockRock's server
-(yes this name is temporary)
+# tengo
+Tengo is a complete reimplementation of the osu!arcade Tencho server in Golang.
+
+# TODO: write an actual readme
