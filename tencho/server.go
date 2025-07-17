@@ -1,6 +1,7 @@
 package tencho
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -17,11 +18,10 @@ type TenchoServer struct {
 	Players *PlayerCollection
 }
 
-func (server *TenchoServer) Serve() {
+func (server *TenchoServer) Serve(ctx context.Context) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.Host, server.Port))
 	if err != nil {
-		server.Logger.Error(fmt.Sprintf("Failed to start Tencho server on %s:%d: %v", server.Host, server.Port, err))
-		return
+		return fmt.Errorf("Failed to start Tencho server on %s:%d: %v", server.Host, server.Port, err)
 	}
 
 	server.Logger.Info(fmt.Sprintf("Tencho server started on %s:%d", server.Host, server.Port))
@@ -33,13 +33,28 @@ func (server *TenchoServer) Serve() {
 	defer listener.Close()
 
 	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			server.Logger.Error(fmt.Sprintf("Failed to accept connection: %v", err))
-			continue
-		}
+		select {
+		case <-ctx.Done():
+			for _, p := range server.Players.AsList() {
+				server.Players.Remove(p)
+			}
 
-		go server.HandleConnection(conn)
+			for _, m := range server.Matches.AsList() {
+				server.Matches.Remove(m)
+			}
+
+			server.Logger.Debug("Context canceled, shutting down server...")
+			return nil
+
+		default:
+			conn, err := listener.Accept()
+			if err != nil {
+				server.Logger.Error(fmt.Sprintf("Failed to accept connection: %v", err))
+				continue
+			}
+
+			go server.HandleConnection(conn)
+		}
 	}
 }
 
@@ -48,21 +63,19 @@ func (server *TenchoServer) StartPing() {
 	defer ticker.Stop()
 
 	for {
-		select {
-		case <-ticker.C:
-			for _, player := range server.Players.AsList() {
-				if player.Conn != nil {
-					// Send outgoing pings
-					err := player.SendPacket(SERVER_PING, []byte{})
-					if err != nil {
-						player.Logger.Error(fmt.Sprintf("Failed to send ping to player %s: %v", player.Username, err))
-					}
+		<-ticker.C
+		for _, player := range server.Players.AsList() {
+			if player.Conn != nil {
+				// Send outgoing pings
+				err := player.SendPacket(SERVER_PING, []byte{})
+				if err != nil {
+					player.Logger.Error(fmt.Sprintf("Failed to send ping to player %s: %v", player.Username, err))
+				}
 
-					// Check incoming pings
-					if time.Now().Unix()-player.LastPingTime > 10 {
-						player.Logger.Warning(fmt.Sprintf("Player %s has not responded to ping, disconnecting", player.Username))
-						server.Players.RemovePlayer(player)
-					}
+				// Check incoming pings
+				if time.Now().Unix()-player.LastPingTime > 10 {
+					player.Logger.Warning(fmt.Sprintf("Player %s has not responded to ping, disconnecting", player.Username))
+					server.Players.Remove(player)
 				}
 			}
 		}
@@ -93,7 +106,7 @@ func (server *TenchoServer) HandleConnection(conn net.Conn) {
 		n, err := conn.Read(buffer)
 		if err != nil {
 			player.Logger.Info("-> Disconnected")
-			server.Players.RemovePlayer(player)
+			server.Players.Remove(player)
 			return
 		}
 

@@ -30,7 +30,7 @@ func HandleAuthenticationRequest(stream *common.IOStream, player *Player) error 
 
 	player.Username = authRequest.Username
 	player.Logger.Info("-> Authenticated")
-	player.Server.Players.AddPlayer(player)
+	player.Server.Players.Add(player)
 
 	// The authentication response packet is empty, hence []byte{}
 	err := player.SendPacket(SERVER_AUTHENTICATION_RESPONSE, []byte{})

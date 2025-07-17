@@ -17,14 +17,14 @@ func NewPlayerCollection() *PlayerCollection {
 	}
 }
 
-func (pc *PlayerCollection) AddPlayer(player *Player) {
+func (pc *PlayerCollection) Add(player *Player) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
 	pc.Players[player.Username] = player
 }
 
-func (pc *PlayerCollection) RemovePlayer(player *Player) {
+func (pc *PlayerCollection) Remove(player *Player) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
@@ -63,38 +63,49 @@ func (pc *PlayerCollection) SendPacket(packetId uint16, data []byte) error {
 // Match collection
 type MatchCollection struct {
 	mu      sync.RWMutex
-	id      int
+	nextId  int
 	Matches map[uint32]*Match
 }
 
 func NewMatchCollection() *MatchCollection {
 	return &MatchCollection{
 		Matches: make(map[uint32]*Match),
+		nextId:  1,
 	}
 }
 
-func (mc *MatchCollection) AddMatch(match *Match) {
+func (mc *MatchCollection) Add(match *Match) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
-	mc.id++
 	mc.Matches[match.MatchID] = match
 }
 
-func (mc *MatchCollection) RemoveMatch(match *Match) {
+func (mc *MatchCollection) Remove(match *Match) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
-	mc.id--
 	delete(mc.Matches, match.MatchID)
 	for _, player := range match.Players {
 		player.Match = nil
 	}
+
+	if len(mc.Matches) == 0 {
+		mc.nextId = 1
+	}
 }
 
-func (mc *MatchCollection) GetNextId() int {
-	mc.id++
-	return mc.id
+func (mc *MatchCollection) AsList() []*Match {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+
+	matchList := make([]*Match, 0, len(mc.Matches))
+
+	for _, match := range mc.Matches {
+		matchList = append(matchList, match)
+	}
+
+	return matchList
 }
 
 func (mc *MatchCollection) Matchmake(player *Player) (*Match, error) {
@@ -106,14 +117,15 @@ func (mc *MatchCollection) Matchmake(player *Player) (*Match, error) {
 		}
 	}
 
-	matchId := mc.GetNextId()
-	newMatch := NewMatch(matchId)
+	matchId := mc.nextId
+	mc.nextId++
 
+	newMatch := NewMatch(matchId)
 	err := newMatch.AddPlayer(player)
 	if err != nil {
 		return nil, err
 	}
 
-	mc.AddMatch(newMatch)
+	mc.Add(newMatch)
 	return newMatch, nil
 }

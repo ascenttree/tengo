@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/BurntSushi/toml"
 	"github.com/ascenttree/tengo/common"
@@ -38,19 +40,17 @@ func main() {
 		common.CreateLogger("tencho", common.INFO),
 	)
 
-	var wg sync.WaitGroup
+	errGroup, ctx := errgroup.WithContext(context.Background())
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		discoveryServer.Serve()
-	}()
+	errGroup.Go(func() error {
+		return discoveryServer.Serve(ctx)
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		tenchoServer.Serve()
-	}()
+	errGroup.Go(func() error {
+		return tenchoServer.Serve(ctx)
+	})
 
-	wg.Wait()
+	if err := errGroup.Wait(); err != nil {
+		fmt.Printf("Error occurred while running Tengo: %v\n", err)
+	}
 }

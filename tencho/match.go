@@ -72,7 +72,7 @@ func (match *Match) RemovePlayer(player *Player) error {
 
 	if len(match.Players) == 0 {
 		match.Logger.Info("Match is empty, so it is being disposed")
-		player.Server.Matches.RemoveMatch(match)
+		player.Server.Matches.Remove(match)
 		return nil
 	}
 
